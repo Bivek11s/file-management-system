@@ -26,13 +26,13 @@ const register = async (req, res) => {
 
     // Generate JWT
     const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
+      expiresIn: "5h",
     });
 
     res.status(200).json(
       formatSuccessResponse("register success", {
         token: token,
-        user: { id: newUser._id, email: newUser.email },
+        user: { userId: newUser._id, email: newUser.email },
       })
     );
   } catch (error) {
@@ -62,7 +62,7 @@ const login = async (req, res) => {
 
     // Generate JWT
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
+      expiresIn: "5h",
     });
 
     res.status(200).json(
