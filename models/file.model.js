@@ -6,7 +6,11 @@ const fileSchema = mongoose.Schema({
   size: { type: Number, required: true },
   uploadDate: { type: Date, default: Date.now },
   mimeType: { type: String, required: true },
-  folder: { type: "String", default: null },
+  folder: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Folder",
+    default: null,
+  }, // Reference to Folder,
   owner: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   sharedWith: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   accessLevel: {
