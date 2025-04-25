@@ -131,4 +131,38 @@ const deleteFolder = async (req, res) => {
   }
 };
 
-export { createFolder, listFolders, renameFolder, deleteFolder };
+//listing files within a folder
+const listFiles = async (req, res) => {
+  try {
+    const folderId = req.params.id;
+    const userId = req.user;
+    if (!folderId) {
+      return res
+        .status(400)
+        .json(
+          formatErrorResponse("Folder list error", "Folder ID is required")
+        );
+    }
+    const folder = await Folder.findOne({ _id: folderId, owner: userId });
+    if (!folder) {
+      return res
+        .status(404)
+        .json(formatErrorResponse("Folder list error", "Folder not found"));
+    }
+
+    const files = await File.find({ folder: folderId }).select(
+      "id fileName uploadDate"
+    );
+    if (!files) {
+      return res
+        .status(404)
+        .json(formatErrorResponse("Folder list error", "No files found"));
+    }
+    res.status(200).json(formatSuccessResponse("Files listed", files));
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+export { createFolder, listFolders, renameFolder, deleteFolder, listFiles };

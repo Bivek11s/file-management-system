@@ -9,7 +9,7 @@ import crypto from "crypto";
 //upload file
 const uploadFile = async (req, res) => {
   try {
-    // const { folder } = req.body;
+    const { folderId } = req.body;
     const file = req.file;
     const userId = req.user;
 
@@ -24,7 +24,7 @@ const uploadFile = async (req, res) => {
       path: file.path,
       size: file.size,
       mimeType: file.mimetype,
-      folder: null,
+      folder: folderId || null,
       owner: userId,
     });
 
@@ -55,9 +55,11 @@ const listUserFiles = async (req, res) => {
     const userId = req.user;
     const files = await File.find({
       $or: [{ owner: userId }, { sharedWith: userId }],
-    }).select(
-      "fileName size uploadDate mimeType owner sharedWith accessLevel shareToken shareTokenExpires"
-    );
+    })
+      .populate("folder", "name")
+      .select(
+        "fileName size uploadDate mimeType folder owner sharedWith accessLevel shareToken shareTokenExpires"
+      );
     res
       .status(200)
       .json(formatSuccessResponse("Files retrieved successfully", files));
