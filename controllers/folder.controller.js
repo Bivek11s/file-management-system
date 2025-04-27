@@ -1,5 +1,4 @@
 import Folder from "../models/folder.model.js";
-import User from "../models/user.model.js";
 import File from "../models/file.model.js";
 import {
   formatErrorResponse,
@@ -143,7 +142,10 @@ const listFiles = async (req, res) => {
           formatErrorResponse("Folder list error", "Folder ID is required")
         );
     }
-    const folder = await Folder.findOne({ _id: folderId, owner: userId });
+    const folder = await Folder.findOne({
+      _id: folderId,
+      owner: userId,
+    });
     if (!folder) {
       return res
         .status(404)

@@ -196,7 +196,8 @@ const downloadFileById = async (req, res) => {
           )
         );
     }
-
+    file.downloadCount += 1;
+    await file.save();
     res.download(file.path, file.fileName);
   } catch (error) {
     res.status(500).json(formatErrorResponse("File download error", error));
@@ -236,6 +237,8 @@ const downloadFileByName = async (req, res) => {
         );
     }
 
+    file.downloadCount += 1;
+    await file.save();
     res.download(file.path, file.fileName);
   } catch (error) {
     res.status(500).json(formatErrorResponse("File download error", error));

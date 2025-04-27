@@ -20,6 +20,7 @@ const fileSchema = mongoose.Schema({
   },
   shareToken: { type: String, default: null },
   shareTokenExpires: { type: Date, default: null },
+  downloadCount: { type: Number, default: 0 },
 });
 
 const File = mongoose.model("File", fileSchema);
