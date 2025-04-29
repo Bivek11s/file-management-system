@@ -16,7 +16,7 @@ const userRouter = express.Router();
 userRouter.post("/register", validateRequest(registerSchema), register);
 userRouter.post("/login", validateRequest(loginSchema), login);
 
-userRouter.get("/google/callback", googleCallback);
+userRouter.get("/google/callback", authMiddleware, googleCallback);
 userRouter.get("/setting/drive", authMiddleware, getDriveSyncStatus);
 userRouter.patch("/setting/drive", authMiddleware, updateDriveSync);
 

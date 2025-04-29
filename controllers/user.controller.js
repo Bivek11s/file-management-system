@@ -7,6 +7,7 @@ import {
   formatErrorResponse,
   formatSuccessResponse,
 } from "../utils/response.utils.js";
+import { oauth2Client } from "../utils/googleDrive.util.js";
 
 dotenv.config();
 
@@ -137,26 +138,54 @@ const updateDriveSync = async (req, res) => {
 const googleCallback = async (req, res) => {
   try {
     const { code } = req.query;
+    if (!code) {
+      return res
+        .status(400)
+        .json(
+          formatErrorResponse(
+            "Google callback error",
+            "Authorization code is missing"
+          )
+        );
+    }
+
     const userId = req.user;
+    console.log("Processing Google callback for user:", userId);
 
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res
+        .status(404)
+        .json(formatErrorResponse("Google callback error", "User not found"));
     }
 
+    console.log("Getting tokens from Google...");
     const { tokens } = await oauth2Client.getToken(code);
+    console.log("Received tokens from Google");
+
+    if (!tokens) {
+      return res
+        .status(500)
+        .json(
+          formatErrorResponse(
+            "Google callback error",
+            "Failed to get tokens from Google"
+          )
+        );
+    }
+
     user.googleDrive.accessToken = tokens.access_token;
     user.googleDrive.refreshToken = tokens.refresh_token;
     user.googleDrive.tokenExpiry = new Date(Date.now() + tokens.expiry_date);
     user.googleDrive.syncEnabled = true;
     await user.save();
-    res.send("google callback success");
-    // res.redirect("http://localhost:3000");
+
+    res.send("Google Drive connection successful!");
   } catch (err) {
-    console.log("error", err);
+    console.error("Google callback error details:", err);
     res
       .status(500)
-      .json(formatErrorResponse("google callback failure", err.message));
+      .json(formatErrorResponse("Google callback failure", err.message));
   }
 };
 

@@ -1,7 +1,26 @@
 import { google } from "googleapis";
 import fs from "fs";
 import axios from "axios";
+import dotenv from "dotenv";
+dotenv.config();
 
+// Validate required environment variables
+const requiredEnvVars = [
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "GOOGLE_REDIRECT_URI",
+];
+const missingEnvVars = requiredEnvVars.filter(
+  (varName) => !process.env[varName]
+);
+
+if (missingEnvVars.length > 0) {
+  throw new Error(
+    `Missing required environment variables: ${missingEnvVars.join(", ")}`
+  );
+}
+
+// Initialize OAuth2 client with validated credentials
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
