@@ -9,7 +9,7 @@ import mongoose from "mongoose";
 import Folder from "../models/folder.model.js";
 import User from "../models/user.model.js";
 import { uploadToDrive } from "../utils/googleDrive.util.js";
-
+import sanitizeFileName from "sanitize-filename";
 //upload file
 const uploadFile = async (req, res) => {
   try {
@@ -20,8 +20,9 @@ const uploadFile = async (req, res) => {
     if (!file) {
       return res
         .status(400)
-        .json(formatErrorResponse("File upload error", "file not found"));
+        .json(formatErrorResponse("File upload error", "File not found"));
     }
+
     let folder = null;
     if (folderId) {
       if (!mongoose.Types.ObjectId.isValid(folderId)) {
@@ -41,8 +42,9 @@ const uploadFile = async (req, res) => {
           );
       }
     }
+
     const newFile = new File({
-      filename: file.originalname,
+      fileName: sanitizeFileName(file.originalname), // Store original name,
       path: file.path,
       size: file.size,
       mimeType: file.mimetype,
@@ -51,30 +53,25 @@ const uploadFile = async (req, res) => {
       googleDrive: { syncStatus: "pending" },
     });
 
-    await newFile.save();
-
-    // Sync to Google Drive if enabled
     const user = await User.findById(userId);
     if (user.googleDrive.syncEnabled && user.googleDrive.refreshToken) {
       try {
         const { fileId, link } = await uploadToDrive(
           user,
-          file.path,
+          safeFilePath,
           file.originalname,
           file.mimetype
         );
-        newFile.googleDrive.fileId = fileId;
-        newFile.googleDrive.link = link;
-        newFile.googleDrive.syncStatus = "synced";
+        newFile.googleDrive = { fileId, link, syncStatus: "synced" };
       } catch (err) {
         newFile.googleDrive.syncStatus = "failed";
         console.error("Google Drive sync error:", err);
       }
-      await newFile.save();
     } else {
       newFile.googleDrive.syncStatus = "not_synced";
-      await newFile.save();
     }
+
+    await newFile.save();
 
     const fileData = {
       id: newFile._id,
@@ -87,17 +84,21 @@ const uploadFile = async (req, res) => {
       googleDrive: newFile.googleDrive,
     };
 
-    await newFile.save();
-
     res
       .status(200)
       .json(formatSuccessResponse("File uploaded successfully", fileData));
   } catch (error) {
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+    if (req.file) {
+      fs.unlink(req.file.path, (err) => {
+        if (err) {
+          console.error("Error deleting file:", err);
+        }
+      });
     }
-    res.status(500).json(formatErrorResponse("File upload error", error));
-    console.log(error);
+    res
+      .status(500)
+      .json(formatErrorResponse("File upload error", error.message));
+    console.error(error);
   }
 };
 
