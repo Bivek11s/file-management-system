@@ -21,6 +21,16 @@ const fileSchema = mongoose.Schema({
   shareToken: { type: String, default: null },
   shareTokenExpires: { type: Date, default: null },
   downloadCount: { type: Number, default: 0 },
+  //for google drive
+  googleDrive: {
+    fileId: { type: String, default: null },
+    link: { type: String, default: null },
+    syncStatus: {
+      type: String,
+      enum: ["pending", "synced", "failed", "not_synced"],
+      default: "not_synced",
+    },
+  },
 });
 
 const File = mongoose.model("File", fileSchema);

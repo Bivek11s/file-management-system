@@ -77,4 +77,87 @@ const login = async (req, res) => {
   }
 };
 
-export { register, login };
+//get drive sync status
+const getDriveSyncStatus = async (req, res) => {
+  try {
+    const userId = req.user;
+    const user = await User.findById(userId).select(
+      "googleDrive.syncEnabled googleDrive.accessToken"
+    );
+    res.json({
+      syncEnabled: user.googleDrive.syncEnabled,
+      isConnected: !!user.googleDrive.accessToken,
+    });
+  } catch (err) {
+    console.log("error", err);
+    res
+      .status(500)
+      .json(formatErrorResponse("get drive sync status failure", err.message));
+  }
+};
+
+// Enable/disable Drive sync
+const updateDriveSync = async (req, res) => {
+  try {
+    const { syncEnabled } = req.body;
+    const userId = req.user;
+
+    if (typeof syncEnabled !== "boolean") {
+      return res
+        .status(400)
+        .json(
+          formatErrorResponse(
+            "Invalid request",
+            "syncEnabled must be a boolean"
+          )
+        );
+    }
+
+    const user = await User.findById(userId);
+    if (!user.googleDrive.accessToken && syncEnabled) {
+      return res
+        .status(400)
+        .json(
+          formatErrorResponse(
+            "Drive sync is not enabled",
+            "Please connect to Google Drive first"
+          )
+        );
+    }
+
+    user.googleDrive.syncEnabled = syncEnabled;
+    await user.save();
+
+    res.json({ message: "Drive sync settings updated", syncEnabled });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+//google callback
+const googleCallback = async (req, res) => {
+  try {
+    const { code } = req.query;
+    const userId = req.user;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { tokens } = await oauth2Client.getToken(code);
+    user.googleDrive.accessToken = tokens.access_token;
+    user.googleDrive.refreshToken = tokens.refresh_token;
+    user.googleDrive.tokenExpiry = new Date(Date.now() + tokens.expiry_date);
+    user.googleDrive.syncEnabled = true;
+    await user.save();
+    res.send("google callback success");
+    // res.redirect("http://localhost:3000");
+  } catch (err) {
+    console.log("error", err);
+    res
+      .status(500)
+      .json(formatErrorResponse("google callback failure", err.message));
+  }
+};
+
+export { register, login, googleCallback, getDriveSyncStatus, updateDriveSync };

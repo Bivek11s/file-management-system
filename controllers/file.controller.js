@@ -5,6 +5,10 @@ import {
 } from "../utils/response.utils.js";
 import fs from "fs";
 import crypto from "crypto";
+import mongoose from "mongoose";
+import Folder from "../models/folder.model.js";
+import User from "../models/user.model.js";
+import { uploadToDrive } from "../utils/googleDrive.util.js";
 
 //upload file
 const uploadFile = async (req, res) => {
@@ -18,15 +22,59 @@ const uploadFile = async (req, res) => {
         .status(400)
         .json(formatErrorResponse("File upload error", "file not found"));
     }
-
+    let folder = null;
+    if (folderId) {
+      if (!mongoose.Types.ObjectId.isValid(folderId)) {
+        return res
+          .status(400)
+          .json(formatErrorResponse("File upload error", "Invalid folder id"));
+      }
+      folder = await Folder.findById(folderId);
+      if (!folder || folder.owner.toString() !== userId) {
+        return res
+          .status(403)
+          .json(
+            formatErrorResponse(
+              "File upload error",
+              "You do not have permission to upload file to this folder"
+            )
+          );
+      }
+    }
     const newFile = new File({
-      fileName: file.originalname,
+      filename: file.originalname,
       path: file.path,
       size: file.size,
       mimeType: file.mimetype,
       folder: folderId || null,
       owner: userId,
+      googleDrive: { syncStatus: "pending" },
     });
+
+    await newFile.save();
+
+    // Sync to Google Drive if enabled
+    const user = await User.findById(userId);
+    if (user.googleDrive.syncEnabled && user.googleDrive.refreshToken) {
+      try {
+        const { fileId, link } = await uploadToDrive(
+          user,
+          file.path,
+          file.originalname,
+          file.mimetype
+        );
+        newFile.googleDrive.fileId = fileId;
+        newFile.googleDrive.link = link;
+        newFile.googleDrive.syncStatus = "synced";
+      } catch (err) {
+        newFile.googleDrive.syncStatus = "failed";
+        console.error("Google Drive sync error:", err);
+      }
+      await newFile.save();
+    } else {
+      newFile.googleDrive.syncStatus = "not_synced";
+      await newFile.save();
+    }
 
     const fileData = {
       id: newFile._id,
@@ -36,6 +84,7 @@ const uploadFile = async (req, res) => {
       mimeType: newFile.mimeType,
       folder: newFile.folder,
       accessLevel: newFile.accessLevel,
+      googleDrive: newFile.googleDrive,
     };
 
     await newFile.save();
@@ -44,6 +93,9 @@ const uploadFile = async (req, res) => {
       .status(200)
       .json(formatSuccessResponse("File uploaded successfully", fileData));
   } catch (error) {
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
     res.status(500).json(formatErrorResponse("File upload error", error));
     console.log(error);
   }
