@@ -6,11 +6,35 @@ import folderRouter from "./routes/folder.route.js";
 import analyticsRouter from "./routes/analytics.route.js";
 import rateLimit from "express-rate-limit";
 import cors from "cors";
+import swaggerJsdoc from "swagger-jsdoc";
+import swaggerUi from "swagger-ui-express";
 
 const app = express();
 app.use(express.json());
 
 app.use(cors({ origin: "http://localhost:3000" }));
+
+// Swagger configuration
+const swaggerOptions = {
+  definition: {
+    openapi: "3.0.0",
+    info: {
+      title: "File Management System API",
+      version: "1.0.0",
+      description: "API documentation for the File Management System",
+    },
+    servers: [
+      {
+        url: "http://localhost:5000",
+        description: "Development server",
+      },
+    ],
+  },
+  apis: ["./routes/*.js"], // Path to the API routes
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Rate limiting for critical endpoints
 const uploadLimiter = rateLimit({
