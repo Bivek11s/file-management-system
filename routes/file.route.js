@@ -33,6 +33,7 @@ const fileRouter = express.Router();
  *               file:
  *                 type: string
  *                 format: binary
+ *                 description: File to upload
  *     responses:
  *       201:
  *         description: File uploaded successfully
@@ -41,7 +42,7 @@ const fileRouter = express.Router();
  *             schema:
  *               $ref: '#/components/schemas/File'
  *       401:
- *         description: Unauthorized
+ *         $ref: '#/components/responses/UnauthorizedError'
  */
 fileRouter.post(
   "/upload",
@@ -82,11 +83,7 @@ fileRouter.get("/list", authMiddleware, analyticsMiddleware, listUserFiles);
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: name
- *         required: true
- *         schema:
- *           type: string
+ *       - $ref: '#/components/parameters/FileName'
  *     responses:
  *       200:
  *         description: File download
@@ -96,9 +93,9 @@ fileRouter.get("/list", authMiddleware, analyticsMiddleware, listUserFiles);
  *               type: string
  *               format: binary
  *       401:
- *         description: Unauthorized
+ *         $ref: '#/components/responses/UnauthorizedError'
  *       404:
- *         description: File not found
+ *         $ref: '#/components/responses/NotFoundError'
  */
 fileRouter.get(
   "/download/name/:name",
@@ -116,11 +113,7 @@ fileRouter.get(
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
+ *       - $ref: '#/components/parameters/FileId'
  *     responses:
  *       200:
  *         description: File download
@@ -130,9 +123,9 @@ fileRouter.get(
  *               type: string
  *               format: binary
  *       401:
- *         description: Unauthorized
+ *         $ref: '#/components/responses/UnauthorizedError'
  *       404:
- *         description: File not found
+ *         $ref: '#/components/responses/NotFoundError'
  */
 fileRouter.get(
   "/download/id/:id",
@@ -150,23 +143,9 @@ fileRouter.get(
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
+ *       - $ref: '#/components/parameters/FileId'
  *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - accessLevel
- *             properties:
- *               accessLevel:
- *                 type: string
- *                 enum: [only_me, anyone_with_link, timed_access]
+ *       $ref: '#/components/requestBodies/FileAccessUpdate'
  *     responses:
  *       200:
  *         description: Access level updated
@@ -175,9 +154,9 @@ fileRouter.get(
  *             schema:
  *               $ref: '#/components/schemas/File'
  *       401:
- *         description: Unauthorized
+ *         $ref: '#/components/responses/UnauthorizedError'
  *       404:
- *         description: File not found
+ *         $ref: '#/components/responses/NotFoundError'
  */
 fileRouter.patch(
   "/access/update/:id",
@@ -195,11 +174,7 @@ fileRouter.patch(
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
+ *       - $ref: '#/components/parameters/FileId'
  *     responses:
  *       200:
  *         description: Shareable link generated
@@ -210,13 +185,17 @@ fileRouter.patch(
  *               properties:
  *                 shareToken:
  *                   type: string
+ *                   description: Token for file sharing
+ *                   example: "abc123def456ghi789"
  *                 shareTokenExpires:
  *                   type: string
  *                   format: date-time
+ *                   description: Share token expiry date
+ *                   example: "2023-12-31T23:59:59Z"
  *       401:
- *         description: Unauthorized
+ *         $ref: '#/components/responses/UnauthorizedError'
  *       404:
- *         description: File not found
+ *         $ref: '#/components/responses/NotFoundError'
  */
 fileRouter.get(
   "/share/:id",
@@ -232,11 +211,7 @@ fileRouter.get(
  *     summary: Access file via shareable link
  *     tags: [Files]
  *     parameters:
- *       - in: path
- *         name: shareToken
- *         required: true
- *         schema:
- *           type: string
+ *       - $ref: '#/components/parameters/ShareToken'
  *     responses:
  *       200:
  *         description: File download
@@ -246,7 +221,7 @@ fileRouter.get(
  *               type: string
  *               format: binary
  *       404:
- *         description: File not found or invalid token
+ *         $ref: '#/components/responses/NotFoundError'
  */
 fileRouter.get(
   "/access/:shareToken",
@@ -263,20 +238,57 @@ fileRouter.get(
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
+ *       - $ref: '#/components/parameters/FileId'
  *     responses:
  *       200:
  *         description: File synced successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: File synced to Google Drive successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     googleDrive:
+ *                       type: object
+ *                       properties:
+ *                         fileId:
+ *                           type: string
+ *                           description: Google Drive file ID
+ *                           example: "1Pt5xOvXnTFJ8lV9tK3lLcLa2XYZ"
+ *                         link:
+ *                           type: string
+ *                           description: Google Drive file link
+ *                           example: "https://drive.google.com/uc?id=1Pt5xOvXnTFJ8lV9tK3lLcLa2XYZ"
+ *                         syncStatus:
+ *                           type: string
+ *                           enum: [pending, synced, failed, not_synced]
+ *                           description: Google Drive sync status
+ *                           example: "synced"
  *       400:
  *         description: Google Drive sync not enabled
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "error"
+ *                 message:
+ *                   type: string
+ *                   example: "Google Drive sync not enabled"
  *       401:
- *         description: Unauthorized
+ *         $ref: '#/components/responses/UnauthorizedError'
  *       404:
- *         description: File not found
+ *         $ref: '#/components/responses/NotFoundError'
  */
 fileRouter.post("/sync/:id", authMiddleware, syncFileToGoogleDrive);
 

@@ -19,21 +19,7 @@ const userRouter = express.Router();
  *     summary: Register a new user
  *     tags: [Users]
  *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - password
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
- *                 minLength: 6
+ *       $ref: '#/components/requestBodies/UserRegistration'
  *     responses:
  *       201:
  *         description: User registered successfully
@@ -49,20 +35,7 @@ userRouter.post("/register", validateRequest(registerSchema), register);
  *     summary: Login user
  *     tags: [Users]
  *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - password
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
+ *       $ref: '#/components/requestBodies/UserLogin'
  *     responses:
  *       200:
  *         description: Login successful
@@ -82,8 +55,21 @@ userRouter.post("/login", validateRequest(loginSchema), login);
  *     responses:
  *       200:
  *         description: Drive sync status retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 syncEnabled:
+ *                   type: boolean
+ *                   description: Whether Google Drive sync is enabled for the user
+ *                 isConnected:
+ *                   type: boolean
+ *                   description: Whether the application is connected to Google Drive
  *       401:
  *         description: Unauthorized
+ *       500:
+ *         description: Server error
  */
 userRouter.get("/setting/drive", authMiddleware, getDriveSyncStatus);
 
@@ -96,19 +82,33 @@ userRouter.get("/setting/drive", authMiddleware, getDriveSyncStatus);
  *     security:
  *       - bearerAuth: []
  *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               enabled:
- *                 type: boolean
+ *       $ref: '#/components/requestBodies/DriveSyncUpdate'
  *     responses:
  *       200:
  *         description: Drive sync settings updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: Drive sync settings updated
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     syncEnabled:
+ *                       type: boolean
+ *                       description: The updated sync status
+ *       400:
+ *         description: Invalid request
  *       401:
  *         description: Unauthorized
+ *       500:
+ *         description: Server error
  */
 userRouter.patch("/setting/drive", authMiddleware, updateDriveSync);
 

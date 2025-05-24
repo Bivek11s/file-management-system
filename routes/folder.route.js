@@ -20,16 +20,7 @@ const folderRouter = express.Router();
  *     security:
  *       - bearerAuth: []
  *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - name
- *             properties:
- *               name:
- *                 type: string
+ *       $ref: '#/components/requestBodies/FolderCreate'
  *     responses:
  *       201:
  *         description: Folder created successfully
@@ -73,22 +64,9 @@ folderRouter.get("/list", authMiddleware, analyticsMiddleware, listFolders);
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
+ *       - $ref: '#/components/parameters/FolderId'
  *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - name
- *             properties:
- *               name:
- *                 type: string
+ *       $ref: '#/components/requestBodies/FolderRename'
  *     responses:
  *       200:
  *         description: Folder renamed successfully
@@ -117,11 +95,7 @@ folderRouter.post(
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
+ *       - $ref: '#/components/parameters/FolderId'
  *     responses:
  *       200:
  *         description: Folder deleted successfully
@@ -146,11 +120,7 @@ folderRouter.delete(
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
+ *       - $ref: '#/components/parameters/FolderId'
  *     responses:
  *       200:
  *         description: List of files in folder
