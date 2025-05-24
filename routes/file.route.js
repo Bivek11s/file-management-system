@@ -7,6 +7,7 @@ import {
   updateFileAccessLevel,
   generateShareableLink,
   accessFileViaShareableLink,
+  syncFileToGoogleDrive,
 } from "../controllers/file.controller.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 import upload from "../middleware/upload.middleware.js";
@@ -252,5 +253,31 @@ fileRouter.get(
   analyticsMiddleware,
   accessFileViaShareableLink
 );
+
+/**
+ * @swagger
+ * /file/sync/{id}:
+ *   post:
+ *     summary: Manually sync file to Google Drive
+ *     tags: [Files]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: File synced successfully
+ *       400:
+ *         description: Google Drive sync not enabled
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: File not found
+ */
+fileRouter.post("/sync/:id", authMiddleware, syncFileToGoogleDrive);
 
 export default fileRouter;

@@ -1,85 +1,87 @@
 import { google } from "googleapis";
 import fs from "fs";
-import axios from "axios";
+import path from "path";
 import dotenv from "dotenv";
+import User from "../models/user.model.js";
 dotenv.config();
 
-// Validate required environment variables
-const requiredEnvVars = [
-  "GOOGLE_CLIENT_ID",
-  "GOOGLE_CLIENT_SECRET",
-  "GOOGLE_REDIRECT_URI",
-];
-const missingEnvVars = requiredEnvVars.filter(
-  (varName) => !process.env[varName]
+// Load service account credentials
+const CREDENTIALS_PATH = path.join(process.cwd(), "config", "credentials.json");
+const serviceAccountCredentials = JSON.parse(
+  fs.readFileSync(CREDENTIALS_PATH, "utf8")
 );
 
-if (missingEnvVars.length > 0) {
-  throw new Error(
-    `Missing required environment variables: ${missingEnvVars.join(", ")}`
-  );
-}
+// Create service account auth client
+const auth = new google.auth.GoogleAuth({
+  credentials: serviceAccountCredentials,
+  scopes: ["https://www.googleapis.com/auth/drive.file"],
+});
 
-// Initialize OAuth2 client with validated credentials
-const oauth2Client = new google.auth.OAuth2(
+// Create Drive client with service account auth
+const drive = google.drive({ version: "v3", auth });
+
+// Keep OAuth2 client for backward compatibility if needed
+export const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
   process.env.GOOGLE_REDIRECT_URI
 );
 
-const drive = google.drive({ version: "v3", auth: oauth2Client });
+// Upload file to Google Drive using service account
+export const uploadToDrive = async (user, filePath, fileName, mimeType) => {
+  try {
+    // Create file metadata
+    const fileMetadata = {
+      name: fileName,
+      // Use the configured folder in .env
+      parents: [process.env.GOOGLE_DRIVE_FOLDER_ID || "root"],
+    };
 
-async function refreshAccessToken(user) {
-  if (!user.googleDrive.refreshToken) {
-    throw new Error("No refresh token available");
-  }
+    // Create media object
+    const media = {
+      mimeType: mimeType,
+      body: fs.createReadStream(filePath),
+    };
 
-  if (
-    !user.googleDrive.tokenExpiry ||
-    user.googleDrive.tokenExpiry < new Date()
-  ) {
-    const response = await axios.post("https://oauth2.googleapis.com/token", {
-      client_id: process.env.GOOGLE_CLIENT_ID,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      refresh_token: user.googleDrive.refreshToken,
-      grant_type: "refresh_token",
+    // Upload file using service account
+    const response = await drive.files.create({
+      resource: fileMetadata,
+      media: media,
+      fields: "id",
     });
 
-    user.googleDrive.accessToken = response.data.access_token;
-    user.googleDrive.tokenExpiry = new Date(
-      Date.now() + response.data.expires_in * 1000
-    );
-    await user.save();
+    const fileId = response.data.id;
+
+    // Make file publicly accessible
+    await drive.permissions.create({
+      fileId,
+      requestBody: {
+        role: "reader",
+        type: "anyone",
+      },
+    });
+
+    // Get shareable link
+    const fileUrl = `https://drive.google.com/uc?id=${fileId}`;
+
+    return { fileId, link: fileUrl };
+  } catch (error) {
+    console.error("Error uploading file to Google Drive:", error);
+    throw error;
   }
+};
 
-  oauth2Client.setCredentials({
-    access_token: user.googleDrive.accessToken,
-    refresh_token: user.googleDrive.refreshToken,
-  });
-}
+// Get file info from Google Drive
+export const getFileInfo = async (fileId) => {
+  try {
+    const response = await drive.files.get({
+      fileId,
+      fields: "id,name,webViewLink,webContentLink,size,mimeType",
+    });
 
-async function uploadToDrive(user, filePath, filename, mimeType) {
-  await refreshAccessToken(user);
-
-  const fileMetadata = {
-    name: filename,
-  };
-
-  const media = {
-    mimeType,
-    body: fs.createReadStream(filePath),
-  };
-
-  const response = await drive.files.create({
-    resource: fileMetadata,
-    media,
-    fields: "id,webViewLink",
-  });
-
-  return {
-    fileId: response.data.id,
-    link: response.data.webViewLink,
-  };
-}
-
-export { oauth2Client, uploadToDrive };
+    return response.data;
+  } catch (error) {
+    console.error("Error getting file info from Google Drive:", error);
+    throw error;
+  }
+};

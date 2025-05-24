@@ -8,7 +8,7 @@ import crypto from "crypto";
 import mongoose from "mongoose";
 import Folder from "../models/folder.model.js";
 import User from "../models/user.model.js";
-import { uploadToDrive } from "../utils/googleDrive.util.js";
+import { uploadToDrive, getFileInfo } from "../utils/googleDrive.util.js";
 import sanitizeFileName from "sanitize-filename";
 //upload file
 const uploadFile = async (req, res) => {
@@ -50,32 +50,41 @@ const uploadFile = async (req, res) => {
       mimeType: file.mimetype,
       folder: folderId || null,
       owner: userId,
-      googleDrive: { syncStatus: "pending" },
+      googleDrive: { syncStatus: "not_synced" },
     });
 
     const user = await User.findById(userId);
-    if (user.googleDrive.syncEnabled && user.googleDrive.refreshToken) {
+    if (user.googleDrive.syncEnabled) {
       try {
+        // Update sync status to pending before upload
+        newFile.googleDrive.syncStatus = "pending";
+        await newFile.save();
+
+        // Upload to Google Drive using service account
         const { fileId, link } = await uploadToDrive(
           user,
-          safeFilePath,
+          file.path,
           file.originalname,
           file.mimetype
         );
-        newFile.googleDrive = { fileId, link, syncStatus: "synced" };
+
+        // Update file with Google Drive info
+        newFile.googleDrive = {
+          fileId,
+          link,
+          syncStatus: "synced",
+        };
       } catch (err) {
         newFile.googleDrive.syncStatus = "failed";
         console.error("Google Drive sync error:", err);
       }
-    } else {
-      newFile.googleDrive.syncStatus = "not_synced";
     }
 
     await newFile.save();
 
     const fileData = {
       id: newFile._id,
-      filename: newFile.filename,
+      fileName: newFile.fileName,
       size: newFile.size,
       uploadDate: newFile.uploadDate,
       mimeType: newFile.mimeType,
@@ -401,6 +410,89 @@ const accessFileViaShareableLink = async (req, res) => {
   }
 };
 
+// Sync file to Google Drive manually
+const syncFileToGoogleDrive = async (req, res) => {
+  try {
+    const fileId = req.params.id;
+    const userId = req.user;
+
+    // Find the file
+    const file = await File.findById(fileId);
+    if (!file) {
+      return res
+        .status(404)
+        .json(formatErrorResponse("File sync error", "File not found"));
+    }
+
+    // Check ownership
+    if (file.owner.toString() !== userId) {
+      return res
+        .status(403)
+        .json(
+          formatErrorResponse(
+            "File sync error",
+            "You do not have permission to sync this file"
+          )
+        );
+    }
+
+    // Get user to check sync settings
+    const user = await User.findById(userId);
+    if (!user.googleDrive.syncEnabled) {
+      return res
+        .status(400)
+        .json(
+          formatErrorResponse(
+            "File sync error",
+            "Google Drive sync is not enabled. Please enable it in settings."
+          )
+        );
+    }
+
+    // Check if file exists locally
+    if (!fs.existsSync(file.path)) {
+      return res
+        .status(404)
+        .json(
+          formatErrorResponse("File sync error", "File not found in the server")
+        );
+    }
+
+    // Update sync status to pending
+    file.googleDrive.syncStatus = "pending";
+    await file.save();
+
+    try {
+      // Upload to Google Drive
+      const { fileId: driveFileId, link } = await uploadToDrive(
+        user,
+        file.path,
+        file.fileName,
+        file.mimeType
+      );
+
+      // Update file with Google Drive info
+      file.googleDrive.fileId = driveFileId;
+      file.googleDrive.link = link;
+      file.googleDrive.syncStatus = "synced";
+      await file.save();
+
+      res.status(200).json(
+        formatSuccessResponse("File synced to Google Drive successfully", {
+          googleDrive: file.googleDrive,
+        })
+      );
+    } catch (error) {
+      file.googleDrive.syncStatus = "failed";
+      await file.save();
+      throw error;
+    }
+  } catch (error) {
+    res.status(500).json(formatErrorResponse("File sync error", error.message));
+    console.error(error);
+  }
+};
+
 export {
   uploadFile,
   listUserFiles,
@@ -409,4 +501,5 @@ export {
   updateFileAccessLevel,
   generateShareableLink,
   accessFileViaShareableLink,
+  syncFileToGoogleDrive,
 };

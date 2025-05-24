@@ -3,7 +3,6 @@ import { validateRequest } from "../middleware/validate.middleware.js";
 import {
   login,
   register,
-  googleCallback,
   getDriveSyncStatus,
   updateDriveSync,
 } from "../controllers/user.controller.js";
@@ -74,22 +73,6 @@ userRouter.post("/login", validateRequest(loginSchema), login);
 
 /**
  * @swagger
- * /user/google/callback:
- *   get:
- *     summary: Google OAuth callback
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Google Drive sync successful
- *       401:
- *         description: Unauthorized
- */
-userRouter.get("/google/callback", authMiddleware, googleCallback);
-
-/**
- * @swagger
  * /user/setting/drive:
  *   get:
  *     summary: Get Google Drive sync status
@@ -128,16 +111,5 @@ userRouter.get("/setting/drive", authMiddleware, getDriveSyncStatus);
  *         description: Unauthorized
  */
 userRouter.patch("/setting/drive", authMiddleware, updateDriveSync);
-
-// Google OAuth: Start authentication (redircts to the consent screen)
-//removed authentication for testing purpose
-userRouter.get("/google", (req, res) => {
-  const authUrl = oauth2Client.generateAuthUrl({
-    access_type: "offline",
-    scope: ["https://www.googleapis.com/auth/drive.file"],
-    prompt: "consent",
-  });
-  res.redirect(authUrl);
-});
 
 export default userRouter;

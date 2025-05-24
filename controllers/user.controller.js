@@ -82,12 +82,11 @@ const login = async (req, res) => {
 const getDriveSyncStatus = async (req, res) => {
   try {
     const userId = req.user;
-    const user = await User.findById(userId).select(
-      "googleDrive.syncEnabled googleDrive.accessToken"
-    );
+    const user = await User.findById(userId).select("googleDrive.syncEnabled");
     res.json({
       syncEnabled: user.googleDrive.syncEnabled,
-      isConnected: !!user.googleDrive.accessToken,
+      // Always connected since we're using service account
+      isConnected: true,
     });
   } catch (err) {
     console.log("error", err);
@@ -100,93 +99,29 @@ const getDriveSyncStatus = async (req, res) => {
 // Enable/disable Drive sync
 const updateDriveSync = async (req, res) => {
   try {
-    const { syncEnabled } = req.body;
+    const { enabled } = req.body;
     const userId = req.user;
 
-    if (typeof syncEnabled !== "boolean") {
+    if (typeof enabled !== "boolean") {
       return res
         .status(400)
         .json(
-          formatErrorResponse(
-            "Invalid request",
-            "syncEnabled must be a boolean"
-          )
+          formatErrorResponse("Invalid request", "enabled must be a boolean")
         );
     }
 
     const user = await User.findById(userId);
-    if (!user.googleDrive.accessToken && syncEnabled) {
-      return res
-        .status(400)
-        .json(
-          formatErrorResponse(
-            "Drive sync is not enabled",
-            "Please connect to Google Drive first"
-          )
-        );
-    }
-
-    user.googleDrive.syncEnabled = syncEnabled;
+    user.googleDrive.syncEnabled = enabled;
     await user.save();
 
-    res.json({ message: "Drive sync settings updated", syncEnabled });
+    res.json(
+      formatSuccessResponse("Drive sync settings updated", {
+        syncEnabled: enabled,
+      })
+    );
   } catch (err) {
-    res.status(500).json({ message: "Server error", error: err.message });
-  }
-};
-//google callback
-const googleCallback = async (req, res) => {
-  try {
-    const { code } = req.query;
-    if (!code) {
-      return res
-        .status(400)
-        .json(
-          formatErrorResponse(
-            "Google callback error",
-            "Authorization code is missing"
-          )
-        );
-    }
-
-    const userId = req.user;
-    console.log("Processing Google callback for user:", userId);
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res
-        .status(404)
-        .json(formatErrorResponse("Google callback error", "User not found"));
-    }
-
-    console.log("Getting tokens from Google...");
-    const { tokens } = await oauth2Client.getToken(code);
-    console.log("Received tokens from Google");
-
-    if (!tokens) {
-      return res
-        .status(500)
-        .json(
-          formatErrorResponse(
-            "Google callback error",
-            "Failed to get tokens from Google"
-          )
-        );
-    }
-
-    user.googleDrive.accessToken = tokens.access_token;
-    user.googleDrive.refreshToken = tokens.refresh_token;
-    user.googleDrive.tokenExpiry = new Date(Date.now() + tokens.expiry_date);
-    user.googleDrive.syncEnabled = true;
-    await user.save();
-
-    res.send("Google Drive connection successful!");
-  } catch (err) {
-    console.error("Google callback error details:", err);
-    res
-      .status(500)
-      .json(formatErrorResponse("Google callback failure", err.message));
+    res.status(500).json(formatErrorResponse("Server error", err.message));
   }
 };
 
-export { register, login, googleCallback, getDriveSyncStatus, updateDriveSync };
+export { register, login, getDriveSyncStatus, updateDriveSync };
