@@ -6,7 +6,7 @@ import User from "../models/user.model.js";
 dotenv.config();
 
 // Load service account credentials
-const CREDENTIALS_PATH = path.join(process.cwd(), "config", "credentials.json");
+const CREDENTIALS_PATH = path.join(process.cwd(), "credentials.json");
 const serviceAccountCredentials = JSON.parse(
   fs.readFileSync(CREDENTIALS_PATH, "utf8")
 );
