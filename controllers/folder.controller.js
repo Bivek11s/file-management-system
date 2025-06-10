@@ -1,170 +1,90 @@
 import Folder from "../models/folder.model.js";
 import File from "../models/file.model.js";
-import {
-  formatErrorResponse,
-  formatSuccessResponse,
-} from "../utils/response.utils.js";
+import { formatSuccessResponse } from "../utils/response.utils.js";
+import asyncHandler from "../utils/asyncHandler.util.js";
+import ErrorHandler from "../utils/errorHandler.util.js";
 
 //creating a folder
-const createFolder = async (req, res) => {
-  try {
-    const { name } = req.body;
-    const userId = req.user;
-    if (!name) {
-      return res
-        .status(400)
-        .json(formatErrorResponse("Folder creation error", "Name is required"));
-    }
-
-    //check existing folder
-    const existingFolder = await Folder.findOne({ name, owner: userId });
-    if (existingFolder) {
-      return res
-        .status(400)
-        .json(
-          formatErrorResponse("Folder creation error", "Folder already exists")
-        );
-    }
-    const folder = new Folder({ name, owner: userId });
-    await folder.save();
-    return res
-      .status(201)
-      .json(formatSuccessResponse("Folder created successfully", folder));
-  } catch (error) {
-    console.log(error);
-    return res
-      .status(500)
-      .json(formatErrorResponse("Folder creation error", error.message));
+const createFolder = asyncHandler(async (req, res, next) => {
+  const { name } = req.body;
+  const userId = req.user;
+  if (!name) {
+    return next(new ErrorHandler("Name is required", 400));
   }
-};
+
+  //check existing folder
+  const existingFolder = await Folder.findOne({ name, owner: userId });
+  if (existingFolder) {
+    return next(new ErrorHandler("Folder already exists", 400));
+  }
+  const folder = new Folder({ name, owner: userId });
+  await folder.save();
+  res
+    .status(201)
+    .json(formatSuccessResponse("Folder created successfully", folder));
+});
 
 // List all user's folders
-const listFolders = async (req, res) => {
-  try {
-    const userId = req.user;
-    const folders = await Folder.find({ owner: userId }).select(
-      "name createdAt"
-    );
-    if (!folders) {
-      return res
-        .status(404)
-        .json(formatErrorResponse("Folder list error", "No folders found"));
-    }
+const listFolders = asyncHandler(async (req, res, next) => {
+  const userId = req.user;
+  const folders = await Folder.find({ owner: userId }).select("name createdAt");
 
-    res.status(200).json(formatSuccessResponse("Folders listed", folders));
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Server error", error: err.message });
-  }
-};
+  res.status(200).json(formatSuccessResponse("Folders listed", folders));
+});
 
 //rename folder
-const renameFolder = async (req, res) => {
-  try {
-    const { name } = req.body;
-    const folderId = req.params.id;
-    const userId = req.user;
-    if (!name) {
-      return res
-        .status(400)
-        .json(
-          formatErrorResponse(
-            "Folder rename error",
-            "Folder ID and new name are required"
-          )
-        );
-    }
-    const folder = await Folder.findOne({ _id: folderId, owner: userId });
-    if (!folder) {
-      return res
-        .status(404)
-        .json(formatErrorResponse("Folder rename error", "Folder not found"));
-    }
-    folder.name = name;
-    await folder.save();
-    res.status(200).json(formatSuccessResponse("Folder renamed", folder));
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Server error", error: err.message });
+const renameFolder = asyncHandler(async (req, res, next) => {
+  const { name } = req.body;
+  const folderId = req.params.id;
+  const userId = req.user;
+  if (!name) {
+    return next(new ErrorHandler("New name is required", 400));
   }
-};
-
-const deleteFolder = async (req, res) => {
-  try {
-    const folderId = req.params.id;
-    const userId = req.user;
-
-    if (!folderId) {
-      return res
-        .status(400)
-        .json(
-          formatErrorResponse("Folder delete error", "Folder ID is required")
-        );
-    }
-
-    const folder = await Folder.findOne({
-      _id: folderId,
-      owner: userId,
-    });
-    if (!folder) {
-      return res
-        .status(404)
-        .json(formatErrorResponse("Folder delete error", "Folder not found"));
-    }
-    if (folder.owner.toString() !== userId) {
-      res
-        .status(401)
-        .json(
-          formatErrorResponse(
-            "Folder delete error",
-            "You are not autorized to delete this folder"
-          )
-        );
-    }
-    await Folder.deleteOne();
-
-    res.status(200).json(formatSuccessResponse("Folder deleted", folder));
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Server error", error: error.message });
+  const folder = await Folder.findOneAndUpdate(
+    { _id: folderId, owner: userId },
+    { name },
+    { new: true }
+  );
+  if (!folder) {
+    return next(new ErrorHandler("Folder not found", 404));
   }
-};
+  res.status(200).json(formatSuccessResponse("Folder renamed", folder));
+});
+
+const deleteFolder = asyncHandler(async (req, res, next) => {
+  const folderId = req.params.id;
+  const userId = req.user;
+
+  const folder = await Folder.findOneAndDelete({ _id: folderId, owner: userId });
+
+  if (!folder) {
+    return next(new ErrorHandler("Folder not found", 404));
+  }
+
+  // Optional: Delete files within the folder
+  await File.deleteMany({ folder: folderId, owner: userId });
+
+  res.status(200).json(formatSuccessResponse("Folder deleted successfully"));
+});
 
 //listing files within a folder
-const listFiles = async (req, res) => {
-  try {
-    const folderId = req.params.id;
-    const userId = req.user;
-    if (!folderId) {
-      return res
-        .status(400)
-        .json(
-          formatErrorResponse("Folder list error", "Folder ID is required")
-        );
-    }
-    const folder = await Folder.findOne({
-      _id: folderId,
-      owner: userId,
-    });
-    if (!folder) {
-      return res
-        .status(404)
-        .json(formatErrorResponse("Folder list error", "Folder not found"));
-    }
+const listFiles = asyncHandler(async (req, res, next) => {
+  const folderId = req.params.id;
+  const userId = req.user;
 
-    const files = await File.find({ folder: folderId }).select(
-      "id fileName uploadDate"
-    );
-    if (!files) {
-      return res
-        .status(404)
-        .json(formatErrorResponse("Folder list error", "No files found"));
-    }
-    res.status(200).json(formatSuccessResponse("Files listed", files));
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Server error", error: error.message });
+  const folder = await Folder.findOne({
+    _id: folderId,
+    owner: userId,
+  });
+  if (!folder) {
+    return next(new ErrorHandler("Folder not found", 404));
   }
-};
+
+  const files = await File.find({ folder: folderId }).select(
+    "id fileName uploadDate"
+  );
+
+  res.status(200).json(formatSuccessResponse("Files listed", files));
+});
 
 export { createFolder, listFolders, renameFolder, deleteFolder, listFiles };

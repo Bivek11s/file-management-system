@@ -8,33 +8,50 @@ import rateLimit from "express-rate-limit";
 import cors from "cors";
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
+import helmet from "helmet";
+import compression from "compression";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
+
+// Middlewares for security and performance
+app.use(helmet());
+app.use(compression());
+
 app.use(express.json());
 
-app.use(cors({ origin: "http://localhost:3000" }));
-
-// Swagger configuration
-const swaggerOptions = {
-  definition: {
-    openapi: "3.0.0",
-    info: {
-      title: "File Management System API",
-      version: "1.0.0",
-      description: "API documentation for the File Management System",
-    },
-    servers: [
-      {
-        url: "http://localhost:5000",
-        description: "Development server",
-      },
-    ],
-  },
-  apis: ["./routes/*.js"], // Path to the API routes
+// CORS configuration
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+  optionsSuccessStatus: 200,
 };
+app.use(cors(corsOptions));
 
-const swaggerSpec = swaggerJsdoc(swaggerOptions);
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+// Swagger configuration (only for development)
+if (process.env.NODE_ENV !== "production") {
+  const swaggerOptions = {
+    definition: {
+      openapi: "3.0.0",
+      info: {
+        title: "File Management System API",
+        version: "1.0.0",
+        description: "API documentation for the File Management System",
+      },
+      servers: [
+        {
+          url: process.env.API_URL || "http://localhost:5000",
+          description: "Development server",
+        },
+      ],
+    },
+    apis: ["./routes/*.js"], // Path to the API routes
+  };
+
+  const swaggerSpec = swaggerJsdoc(swaggerOptions);
+  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+}
 
 // Rate limiting for critical endpoints
 const uploadLimiter = rateLimit({
@@ -70,5 +87,9 @@ app.use("/user", userRouter);
 app.use("/file", fileRouter);
 app.use("/folder", folderRouter);
 app.use("/analytics", analyticsRouter);
+
+// Error handling middleware
+import errorMiddleware from "./middleware/error.middleware.js";
+app.use(errorMiddleware);
 
 export default app;
