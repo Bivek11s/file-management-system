@@ -5,13 +5,15 @@ import dotenv from "dotenv";
 import User from "../models/user.model.js";
 dotenv.config();
 
-// Determine project root based on environment (Render vs. local)
-// On Render, the app runs from /opt/render/project/src, but secrets are in /opt/render/project
-const isRender = process.env.RENDER === 'true';
-const projectRoot = isRender ? path.join(process.cwd(), '..') : process.cwd();
-
-// Load service account credentials
-const CREDENTIALS_PATH = path.join(projectRoot, "credentials.json");
+// Determine credentials path based on environment
+let CREDENTIALS_PATH;
+if (process.env.RENDER === 'true') {
+  // On Render, Secret Files are available at /etc/secrets/<filename>
+  CREDENTIALS_PATH = '/etc/secrets/credentials.json';
+} else {
+  // For local development, use the file in the project root
+  CREDENTIALS_PATH = path.join(process.cwd(), 'credentials.json');
+}
 const serviceAccountCredentials = JSON.parse(
   fs.readFileSync(CREDENTIALS_PATH, "utf8")
 );
